@@ -10,9 +10,9 @@ def pixel_norm(x,dim,epsilon=1e-8):
     return x/torch.sqrt(torch.mean(x**2,dim=dim,keepdim=True)+epsilon)
 
 class EqualizedConv(nn.Module):
-    def __init__(self,in_c,out_c,kernel_size=3,stride=1,padding=1,gain=2):
+    def __init__(self,in_c,out_c,kernel_size=3,stride=1,padding=1,gain=2,bias=False):
         super().__init__()
-        self.conv=nn.Conv2d(in_c,out_c,kernel_size,stride,padding)
+        self.conv=nn.Conv2d(in_c,out_c,kernel_size,stride,padding,bias=bias)
         self.scale=(gain/(in_c*kernel_size**2))**0.5
         
     def forward(self,x):
@@ -48,18 +48,24 @@ class AddNoise(nn.Module):
         outputs=x+self.conv(noise)
         return outputs
 
-class AdaIN(nn.Module):
+class AddBias(nn.Module):
+    def __init__(self,c):
+        super().__init__()
+        self.b=nn.Parameter(torch.zeros(1,c,1,1,requires_grad=True))
+    
+    def forward(self,x):
+        return x+self.b
+
+class AdaIN(nn.Module):     #Adaptive InstanceNormalization,but std affine only
     def __init__(self,x_c,w_c,gain=1,**kwargs):
         super().__init__()
         self.x_c=x_c
         self.dense_0=EqualizedDense(w_c,x_c,gain=gain)
-        self.dense_1=EqualizedDense(w_c,x_c,gain=gain)
 
     def forward(self,inputs):
         x,w=inputs
         ys=self.dense_0(w).reshape(-1,self.x_c,1,1)
-        yb=self.dense_1(w).reshape(-1,self.x_c,1,1)
-        return ys*x+yb
+        return ys*x
 
 class Mapping(nn.Module):
     def __init__(self,z_dim=512):
@@ -77,47 +83,39 @@ class Mapping(nn.Module):
         return w
 
 class G_block(nn.Module):
-    def __init__(self,in_c,out_c,w_c,is_base):
+    def __init__(self,in_c,out_c,w_c,need_upsample=False):
         super().__init__()
         self.in_c=in_c
         self.out_c=out_c
         self.w_c=w_c
-        self.is_base=is_base
+        self.need_upsample=need_upsample
         self.upsample=nn.Upsample(scale_factor=2)
         self.eq_conv0=EqualizedConv(in_c,out_c,kernel_size=3)
+        self.add_bias=AddBias(out_c)
         self.add_noise0=AddNoise(out_c)
         self.leaky0=nn.LeakyReLU(0.2)
         self.ins_norm0=nn.InstanceNorm2d(out_c)
-        self.ada_in0=AdaIN(out_c,w_c)
-        self.eq_conv1=EqualizedConv(out_c,out_c)
-        self.add_noise1=AddNoise(out_c)
-        self.leaky1=nn.LeakyReLU(0.2)
-        self.ins_norm1=nn.InstanceNorm2d(out_c)
-        self.ada_in1=AdaIN(out_c,w_c)
+        self.ada_in0=AdaIN(in_c,w_c)
 
     def forward(self,inputs):
         x,w,noise=inputs
-        if not self.is_base:
+        x=self.ada_in0([x,w])
+        if self.need_upsample:
             x=self.upsample(x)
-            x=self.eq_conv0(x)
+        
+        x=self.eq_conv0(x)
+        x=self.ins_norm0(x)
+        x=self.add_bias(x)
         x=self.add_noise0([x,noise])
         x=self.leaky0(x)
-        x=self.ins_norm0(x)
-        x=self.ada_in0([x,w])
-
-        x=self.eq_conv1(x)
-        x=self.add_noise1([x,noise])
-        x=self.leaky1(x)
-        x=self.ins_norm1(x)
-        x=self.ada_in1([x,w])
-
         return x
 
 class Generator(nn.Module):
-    def __init__(self,start_res=(4,4),w_c=512,start_c=512,max_steps=6):
+    def __init__(self,start_res=(4,4),w_c=512,start_c=512,steps=6):
         super().__init__()
         self.g_blocks=nn.ModuleList()
         self.to_rgbs=nn.ModuleList()
+        self.up_samples=nn.ModuleList()
         self.n_channels={
             0:start_c,
             1:start_c,
@@ -129,114 +127,65 @@ class Generator(nn.Module):
         }
         self.start_res=start_res
         self.w_c=w_c
+        self.steps=steps
         self.map_net=Mapping(z_dim=w_c)
-        for i in range(max_steps+1):
+        for i in range(steps+1):
             c=self.n_channels[i]
             to_rgb=EqualizedConv(c,3,kernel_size=1,padding=0)
             self.to_rgbs.append(to_rgb)
-            is_base=i==0
-            self.g_blocks.append(G_block(self.n_channels[i-1] if i!=0 else start_c,c,w_c,is_base))
+            if i>=1:
+                self.g_blocks.append(G_block(self.n_channels[i-1],c,w_c,need_upsample=True))
+            self.g_blocks.append(G_block(c,c,w_c,need_upsample=False))
+        for i in range(steps):
+            self.up_samples.append(nn.Upsample(scale_factor=2))
 
-    def forward(self,inputs,step,alpha):
+    def forward(self,inputs):
         x,w=inputs
         w=self.map_net(w)
-        if step==0:
-            height=self.start_res[0]
-            width=self.start_res[1]
-            noise=torch.randn((1,1,height,width)).to(device)
-            x=self.g_blocks[0]([x,w,noise])
-            return self.to_rgbs[0](x)
-        else:
-            # print('x,step,alpha:',x.shape,step,alpha)
-            for i in range(step):
-                height=self.start_res[0]*2**i
-                width=self.start_res[1]*2**i
+        rgb_out=None
+        for i in range(self.steps+1):
+            height=self.start_res[0]*2**i
+            width=self.start_res[1]*2**i
+            if i==0:
                 noise=torch.randn((1,1,height,width)).to(device)
-                x=self.g_blocks[i]([x,w,noise])
+                x=self.g_blocks[0]([x,w,noise])
+                rgb_out=self.to_rgbs[0](x)
+            else:
+                noise=torch.randn((1,1,height,width)).to(device)
+                x=self.g_blocks[2*i-1]([x,w,noise])
+                noise=torch.randn((1,1,height,width)).to(device)
+                x=self.g_blocks[2*i]([x,w,noise])
+                rgb_out=self.up_samples[i-1](rgb_out)
+                rgb_out+=self.to_rgbs[i](x)
 
-            old_rgb=self.to_rgbs[step-1](x)
-            old_rgb=nn.Upsample(scale_factor=2)(old_rgb)
-            height=self.start_res[0]*2**step
-            width=self.start_res[1]*2**step
-            noise=torch.randn((1,1,height,width)).to(device)
-            x=self.g_blocks[step]([x,w,noise])
-            new_rgb=self.to_rgbs[step](x)
-            return fade_in(alpha,new_rgb,old_rgb)
+        return rgb_out
 
-class ResBlock(nn.Module):
-    def __init__(self,in_c,out_c,pool_factor=2):
-        super(ResBlock,self).__init__()
-        self.pool_factor=pool_factor
-        self.conv0=EqualizedConv(in_c,out_c,3,padding='same')
-        self.leaky_relu0=nn.LeakyReLU(0.2)
-        self.conv1=EqualizedConv(out_c,out_c,3,padding='same')
-        self.leaky_relu1=nn.LeakyReLU(0.2)
-        self.conv2=EqualizedConv(in_c,out_c,1,padding='same')
-        self.ins_norm=nn.InstanceNorm2d(out_c)
-        self.avg_pool=nn.AvgPool2d(pool_factor)
-
-    def forward(self,x):
-        x_skip=self.conv2(x)
-        x=self.conv0(x)
-        x=self.leaky_relu0(x)
-        x=self.conv1(x)
-        x=self.leaky_relu1(x)
-        x=x+x_skip
-        x=self.ins_norm(x)
-        x=self.avg_pool(x)
-        return x
-
-# class Discriminator(nn.Module):
-#     def __init__(self):
-#         super(Discriminator,self).__init__()
-#         self.net=nn.Sequential(
-#             ResBlock(3,64),
-#             ResBlock(64,128),
-#             ResBlock(128,128),
-#             ResBlock(128,256),
-#             ResBlock(256,256),
-#             nn.Flatten(),
-#             nn.Linear(5*8*256,512),
-#             nn.LeakyReLU(0.1),
-#             nn.Dropout(0.1),
-#             nn.Linear(512,1),
-#             # nn.Sigmoid(),
-#         )
-
-#     def forward(self,x):
-#         return self.net(x)
-
-class D_block_base(nn.Module):
-    def __init__(self,in_c,out_c,hidden_units):
+class D_block(nn.Module):
+    def __init__(self,in_c,out_c):
         super().__init__()
-        self.eq_conv=EqualizedConv(in_c+1,out_c)
-        self.leaky0=nn.LeakyReLU(0.2)
-        self.flatten=nn.Flatten()
-        self.eq_dense0=EqualizedDense(hidden_units,out_c)
-        self.leaky1=nn.LeakyReLU(0.2)
-        self.eq_dense1=EqualizedDense(out_c,1)
-
-    def minibatch_std(self,x):
-        batch_statistics=x.std(dim=0).mean().repeat(x.shape[0],1,x.shape[2],x.shape[3])
-        return torch.cat([x,batch_statistics],dim=1)
+        self.down_sample0=nn.AvgPool2d(2)
+        self.down_sample1=nn.AvgPool2d(2)
+        self.eq_conv=EqualizedConv(in_c,out_c,bias=True)
+        self.conv=nn.Conv2d(in_c,out_c,kernel_size=3,padding=1)
+        self.bn=nn.BatchNorm2d(out_c)
+        self.leaky=nn.LeakyReLU(0.2)
 
     def forward(self,x):
-        x=self.minibatch_std(x)
+        x_skip=self.down_sample0(x)
+        x_skip=self.conv(x_skip)
         x=self.eq_conv(x)
-        x=self.leaky0(x)
-        x=self.flatten(x)
-        x=self.eq_dense0(x)
-        x=self.leaky1(x)
-        x=self.eq_dense1(x)
-
+        x=self.down_sample1(x)
+        x=x+x_skip
+        x=self.bn(x)
+        x=self.leaky(x)
         return x
 
 class Discriminator(nn.Module):
-    def __init__(self,start_res=(4,4),start_c=512,max_step=6):
+    def __init__(self,start_res=(4,4),start_c=512,steps=6):
         super().__init__()
         self.start_res=start_res
+        self.steps=steps
         self.d_blocks=nn.ModuleList()
-        self.from_rgbs=nn.ModuleList()
         self.n_channels={
             0:start_c,
             1:start_c,
@@ -246,30 +195,25 @@ class Discriminator(nn.Module):
             5:int(start_c/4),
             6:int(start_c/8),
         }
+        self.from_rgb=EqualizedConv(in_c=3,out_c=self.n_channels[steps])
+        self.flatten=nn.Flatten()
+        self.dense0=nn.Linear(start_res[0]*start_res[1]*self.n_channels[0],512)
+        self.leaky=nn.LeakyReLU(0.2)
+        self.dense1=nn.Linear(512,1)
+        self.sigmoid=nn.Sigmoid()
+        for i in range(steps,0,-1):
+            self.d_blocks.append(D_block(self.n_channels[i],self.n_channels[i-1]))
 
-        for i in range(max_step+1):
-            from_rgb=EqualizedConv(3,self.n_channels[i],kernel_size=1,padding=0)
-            self.from_rgbs.append(from_rgb)
-            if i==0:
-                self.d_blocks.append(D_block_base(start_c,start_c,start_res[0]*start_res[1]*start_c))
-            else:
-                self.d_blocks.append(ResBlock(self.n_channels[i],self.n_channels[i-1]))
-
-    def forward(self,x,step,alpha):
-        if step==0:
-            x=self.from_rgbs[0](x)
-            x=self.d_blocks[0](x)
-            return x
-        else:
-            downsized_image=nn.AvgPool2d(2)(x)
-            x0=self.from_rgbs[step-1](downsized_image)
-            x1=self.from_rgbs[step](x)
-            x1=self.d_blocks[step](x1)
-            # print('x0,x1:',x0.shape,x1.shape)
-            x=fade_in(alpha,x1,x0)
-            for i in range(step-1,-1,-1):
-                x=self.d_blocks[i](x)
-            return x
+    def forward(self,x):
+        x=self.from_rgb(x)
+        for i in range(self.steps):
+            x=self.d_blocks[i](x)
+        x=self.flatten(x)
+        x=self.dense0(x)
+        x=self.leaky(x)
+        x=self.dense1(x)
+        x=self.sigmoid(x)
+        return x
 
 if __name__=='__main__':
     device='cuda'
@@ -280,9 +224,9 @@ if __name__=='__main__':
     x=torch.randn((batch_size,start_c,start_res[0],start_res[1])).to(device)
     w=torch.randn((batch_size,w_c)).to(device)
     gen=Generator(start_res=start_res,start_c=start_c).to(device)
-    out=gen([x,w],0,0)
+    out=gen([x,w])
     print('out shape:',out.shape)
     disc=Discriminator(start_res=start_res,start_c=start_c).to(device)
-    disc_out=disc(out,0,0)
+    disc_out=disc(out)
     print(disc_out)
     
