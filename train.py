@@ -12,7 +12,7 @@ import torch.optim as optim
 from torchvision.utils import save_image
 
 epoch=20
-batch_size=32
+batch_size=16
 start_res=(4,4)
 start_c=256
 w_c=512
