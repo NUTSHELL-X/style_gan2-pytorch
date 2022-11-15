@@ -11,8 +11,8 @@ from model import Generator,Discriminator
 import torch.optim as optim
 from torchvision.utils import save_image
 
-epoch=20
-batch_size=16
+epoch=5
+batch_size=8
 start_res=(4,4)
 start_c=256
 w_c=512
