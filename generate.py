@@ -18,12 +18,12 @@ base_tensor=torch.ones((1,start_c,start_res[0],start_res[1])).to(device)
 # plot_images(images)
 x=torch.randn((1,w_c)).to(device)
 y=torch.randn((1,w_c)).to(device)
-n_frames=500
+n_frames=200
 images=[]
 for i in range(n_frames+1):
     a=i/n_frames
     z=a*x+(1-a)*y
-    image=gen([base_tensor,z],5,1).squeeze().to('cpu').detach().permute(1,2,0).numpy()
+    image=gen([base_tensor,z]).squeeze().to('cpu').detach().permute(1,2,0).numpy()
     print(image.shape)
     images.append(image)
 
