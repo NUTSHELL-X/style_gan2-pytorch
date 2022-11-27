@@ -218,8 +218,8 @@ class Discriminator(nn.Module):
 if __name__=='__main__':
     device='cuda'
     start_res=[5,8]
-    batch_size=16
-    start_c=256
+    batch_size=2
+    start_c=512
     w_c=512
     x=torch.randn((batch_size,start_c,start_res[0],start_res[1])).to(device)
     w=torch.randn((batch_size,w_c)).to(device)

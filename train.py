@@ -11,12 +11,11 @@ from model import Generator,Discriminator
 import torch.optim as optim
 from torchvision.utils import save_image
 
-epoch=5
-batch_size=8
-start_res=(4,4)
+batch_size=4
+start_res=(5,8)
 start_c=256
 w_c=512
-save_path='Diana_saved.pt'
+save_path='MC_saved.pt'
 device='cuda' if torch.cuda.is_available() else "cpu"
 gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c).to(device)
 disc=Discriminator(start_res=start_res,start_c=start_c).to(device)
@@ -39,7 +38,7 @@ loss_fn=nn.BCELoss()
 base_tensor=torch.ones((batch_size,start_c,start_res[0],start_res[1])).to(device)
 def train_fn(epochs):
     for i in range(epochs):
-        dataloader=create_dataloader(256,batch_size)
+        dataloader=create_dataloader((320,512),batch_size)
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
             real=real.to(device)
@@ -64,12 +63,12 @@ def train_fn(epochs):
             # latent=torch.randn(batch_size,w_c).to(device)
             # fake=gen([base_tensor,latent],5)
 
-        save_image(fake.cpu().detach()[0],f'generated_Diana/generated_img_{total_epochs+i}.jpg')
+        save_image(fake.cpu().detach()[0],f'generated_MC_landscapes/generated_img_{total_epochs+i}.jpg')
 
 
 
 if __name__=='__main__':
-    epochs=50
+    epochs=30
     train_fn(epochs)
     total_epochs+=epochs
     # n_examples=4

@@ -6,7 +6,7 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from torchvision.datasets import ImageFolder
-ds_folder='./Diana-256-v1_1'
+ds_folder='./MineCraft-RT_1280x720_v12'
 
 class SingleFolderDataset(Dataset): #返回一个Dataset的实例，用于读取单个文件夹内的图片
     def __init__(self,folder,transform):

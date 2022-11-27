@@ -8,9 +8,9 @@ start_c=256
 w_c=512
 batch_size=12
 device='cuda' if torch.cuda.is_available() else 'cpu'
-start_res=(4,4)
+start_res=(5,8)
 gen=Generator(start_res=start_res,start_c=start_c).to(device)
-checkpoint=torch.load('Diana_saved.pt')
+checkpoint=torch.load('MC_saved.pt')
 gen.load_state_dict(checkpoint['gen_state_dict'])
 base_tensor=torch.ones((1,start_c,start_res[0],start_res[1])).to(device)
 # w=torch.randn((batch_size,w_c)).to(device)
@@ -27,4 +27,4 @@ for i in range(n_frames+1):
     print(image.shape)
     images.append(image)
 
-imageio.mimsave('gif/generated2.gif',images,fps=20)
+imageio.mimsave('gif/generated_mc_landscape.gif',images,fps=20)
