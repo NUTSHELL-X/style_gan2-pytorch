@@ -1,2 +1,4 @@
-./generated_Diana
-Diana_saved.pt
+generated_Diana/
+*.pt
+generated_Diana2/
+gif/

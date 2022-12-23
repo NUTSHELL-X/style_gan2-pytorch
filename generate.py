@@ -23,7 +23,7 @@ images=[]
 for i in range(n_frames+1):
     a=i/n_frames
     z=a*x+(1-a)*y
-    image=gen([base_tensor,z],5,1).squeeze().to('cpu').detach().permute(1,2,0).numpy()
+    image=gen([base_tensor,z]).squeeze().to('cpu').detach().permute(1,2,0).numpy()
     print(image.shape)
     images.append(image)
 

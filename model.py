@@ -61,11 +61,13 @@ class AdaIN(nn.Module):     #Adaptive InstanceNormalization,but std affine only
         super().__init__()
         self.x_c=x_c
         self.dense_0=EqualizedDense(w_c,x_c,gain=gain)
+        self.dense_1=EqualizedDense(w_c,x_c,gain=gain)
 
     def forward(self,inputs):
         x,w=inputs
         ys=self.dense_0(w).reshape(-1,self.x_c,1,1)
-        return ys*x
+        yb=self.dense_1(w).reshape(-1,self.x_c,1,1)
+        return ys*x+yb
 
 class Mapping(nn.Module):
     def __init__(self,z_dim=512):
@@ -90,8 +92,8 @@ class G_block(nn.Module):
         self.w_c=w_c
         self.need_upsample=need_upsample
         self.upsample=nn.Upsample(scale_factor=2)
-        self.eq_conv0=EqualizedConv(in_c,out_c,kernel_size=3)
-        self.add_bias=AddBias(out_c)
+        self.eq_conv0=EqualizedConv(in_c,out_c,kernel_size=3,bias=True)
+        # self.add_bias=AddBias(out_c)
         self.add_noise0=AddNoise(out_c)
         self.leaky0=nn.LeakyReLU(0.2)
         self.ins_norm0=nn.InstanceNorm2d(out_c)
@@ -99,13 +101,13 @@ class G_block(nn.Module):
 
     def forward(self,inputs):
         x,w,noise=inputs
+        x=self.ins_norm0(x)
         x=self.ada_in0([x,w])
         if self.need_upsample:
             x=self.upsample(x)
         
         x=self.eq_conv0(x)
-        x=self.ins_norm0(x)
-        x=self.add_bias(x)
+        # x=self.add_bias(x)
         x=self.add_noise0([x,noise])
         x=self.leaky0(x)
         return x
@@ -200,7 +202,7 @@ class Discriminator(nn.Module):
         self.dense0=nn.Linear(start_res[0]*start_res[1]*self.n_channels[0],512)
         self.leaky=nn.LeakyReLU(0.2)
         self.dense1=nn.Linear(512,1)
-        self.sigmoid=nn.Sigmoid()
+        # self.sigmoid=nn.Sigmoid()
         for i in range(steps,0,-1):
             self.d_blocks.append(D_block(self.n_channels[i],self.n_channels[i-1]))
 
@@ -212,7 +214,7 @@ class Discriminator(nn.Module):
         x=self.dense0(x)
         x=self.leaky(x)
         x=self.dense1(x)
-        x=self.sigmoid(x)
+        # x=self.sigmoid(x)
         return x
 
 if __name__=='__main__':
