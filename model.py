@@ -131,6 +131,7 @@ class Generator(nn.Module):
         self.w_c=w_c
         self.steps=steps
         self.map_net=Mapping(z_dim=w_c)
+        self.sigmoid=nn.Sigmoid()
         for i in range(steps+1):
             c=self.n_channels[i]
             to_rgb=EqualizedConv(c,3,kernel_size=1,padding=0)
@@ -140,7 +141,7 @@ class Generator(nn.Module):
             self.g_blocks.append(G_block(c,c,w_c,need_upsample=False))
         for i in range(steps):
             self.up_samples.append(nn.Upsample(scale_factor=2))
-
+       
     def forward(self,inputs):
         x,w=inputs
         w=self.map_net(w)
@@ -160,7 +161,7 @@ class Generator(nn.Module):
                 rgb_out=self.up_samples[i-1](rgb_out)
                 rgb_out+=self.to_rgbs[i](x)
 
-        return rgb_out
+        return self.sigmoid(rgb_out)
 
 class D_block(nn.Module):
     def __init__(self,in_c,out_c):
@@ -220,8 +221,8 @@ class Discriminator(nn.Module):
 if __name__=='__main__':
     device='cuda'
     start_res=[5,8]
-    batch_size=16
-    start_c=256
+    batch_size=2
+    start_c=512
     w_c=512
     x=torch.randn((batch_size,start_c,start_res[0],start_res[1])).to(device)
     w=torch.randn((batch_size,w_c)).to(device)

@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import cv2
+# import cv2
 
 def plot_images(images,max_num=16,n_col=4):
     if isinstance(images,tf.Tensor):
