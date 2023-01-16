@@ -6,7 +6,11 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from torchvision.datasets import ImageFolder
-ds_folder='./MineCraft-RT_1280x720_v12'
+from utils import config_parser
+
+parser=config_parser()
+args=parser.parse_args()
+ds_folder=args.dataset_path
 
 class SingleFolderDataset(Dataset): #返回一个Dataset的实例，用于读取单个文件夹内的图片
     def __init__(self,folder,transform):

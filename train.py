@@ -12,44 +12,30 @@ import torch.optim as optim
 from torchvision.utils import save_image
 from torch.cuda.amp import autocast
 from torch.optim.lr_scheduler import MultiStepLR
-
-def config_parser():
-    import configargparse
-    parser=configargparse.ArgumentParser()
-    parser.add_argument('--config',is_config_file=True,help='config file path',default='config.txt')
-    parser.add_argument('--model_path',type=str) # path to save weights(.pt file)
-    parser.add_argument('--image_folder_path',type=str) # path to save generated images(.jpg file) 
-    parser.add_argument('--dataset_path',type=str) # path containing dataset
-    parser.add_argument('--epoch',type=int)
-    parser.add_argument('--dtype',type=str) # data type used for training(fp16,fp32,mixed)
-    parser.add_argument('--start_res',type=tuple) # 
-    parser.add_argument('--upscale_times',type=int)
-    parser.add_argument('--start_c',type=int) # channels for input constant(torch.ones)
-    parser.add_argument('--w_c',type=int) # channels for style code
-    parser.add_argument('--batch_size',type=int)
-    parser.add_argument('--lr',type=float) # learning rate
-    parser.add_argument('--lr_decay',type=bool) # learning rate decay or not
-    parser.add_argument('--milestones',type=list,action='append') # milestones for learning rate decay
-    parser.add_argument('--gamma',type=float) # learning rate decay ratio
-
-    return parser
+from utils import config_parser
 
 parser=config_parser()
 args=parser.parse_args()
 batch_size=args.batch_size
 start_res=args.start_res
+print(start_res,type(start_res))
 start_c=args.start_c
 w_c=args.w_c
 save_images=True
 auto_scale=True
 model_path=args.model_path
 lr=args.lr
-print()
+upscale_times=args.upscale_times
+final_h=start_res[0]*2**upscale_times
+final_w=start_res[1]*2**upscale_times
+generated_image_folder=args.generated_image_folder
+# milestones=args.milestones
+# print(milestones)
 device='cuda' if torch.cuda.is_available() else "cpu"
 gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c).to(device)
 disc=Discriminator(start_res=start_res,start_c=start_c).to(device)
-opt_gen=optim.Adam(gen.parameters(),lr=1e-4)
-opt_disc=optim.Adam(disc.parameters(),lr=1e-4)
+opt_gen=optim.Adam(gen.parameters(),lr=lr)
+opt_disc=optim.Adam(disc.parameters(),lr=lr)
 sche_gen=MultiStepLR(opt_gen, milestones=[30,80,150,200,250], gamma=0.7)
 sche_disc=MultiStepLR(opt_disc, milestones=[30,80,150,200,250], gamma=0.7)
 total_epochs=0
@@ -74,9 +60,9 @@ base_tensor=torch.ones((batch_size,start_c,start_res[0],start_res[1])).to(device
 if auto_scale:
     scaler_disc = torch.cuda.amp.GradScaler()
     scaler_gen = torch.cuda.amp.GradScaler()
+dataloader=create_dataloader((final_h,final_w),batch_size)
 def train_fn(epochs):
     for i in range(epochs):
-        dataloader=create_dataloader((320,512),batch_size)
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
             real=real.to(device)
@@ -100,11 +86,12 @@ def train_fn(epochs):
             opt_gen.step()
         
         if save_images:
-            save_image(fake.cpu().detach()[0],f'generated_MC_landscapes/generated_img_{total_epochs+i}.jpg')
+            if not os.path.exists(generated_image_folder):
+                os.mkdir(generated_image_folder)
+            save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}.jpg')
 
 def train_fn_auto_scaler(epochs):
     for i in range(epochs):
-        dataloader=create_dataloader((320,512),batch_size)
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
             real=real.to(device)
@@ -132,7 +119,7 @@ def train_fn_auto_scaler(epochs):
             scaler_gen.update()
         
         if save_images:
-            save_image(fake.cpu().detach()[0],f'generated_MC_landscapes/generated_img_{total_epochs+i}.jpg')
+            save_image(fake.cpu().detach()[0],generated_image_path+f'generated_img_{total_epochs+i}.jpg')
 
 if __name__=='__main__':
     epochs=5
