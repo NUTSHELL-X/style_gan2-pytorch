@@ -12,6 +12,29 @@ parser=config_parser()
 args=parser.parse_args()
 ds_folder=args.dataset_path
 
+class MultiFolderDataset(Dataset):
+    def __init__(self,folder,transform):
+        folder=os.path.expanduser(folder) # change "~/" to "/home/user/"
+        self.transform=transform
+        self.images=[]
+        class_idx=0
+        for class_folder in os.listdir(folder):
+            cur_folder=os.path.join(folder,class_folder)
+            for image_path in os.listdir(cur_folder):
+                image=Image.open(os.path.join(cur_folder,image_path))
+                image=np.array(image)
+                self.images.append([image,class_idx])
+            class_idx+=1
+
+    def __len__(self):
+        return len(self.images)
+    
+    def __getitem__(self, idx):
+        image,class_idx=self.images[idx]
+        if self.transform:
+            image=self.transform(image=image)['image']
+        return image,class_idx
+    
 class SingleFolderDataset(Dataset): #返回一个Dataset的实例，用于读取单个文件夹内的图片
     def __init__(self,folder,transform):
         self.folder=folder
@@ -50,6 +73,7 @@ def create_dataloader(res,batch_size):
             ToTensorV2(),
         ]
     )
-    ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
-    dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True)
+    # ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
+    ds=MultiFolderDataset(folder=ds_folder,transform=transforms)
+    dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=4)
     return dl

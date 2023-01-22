@@ -122,7 +122,7 @@ def train_fn_auto_scaler(epochs):
             save_image(fake.cpu().detach()[0],generated_image_path+f'generated_img_{total_epochs+i}.jpg')
 
 if __name__=='__main__':
-    epochs=5
+    epochs=args.epoch
     train_fn(epochs)
     total_epochs+=epochs
     # n_examples=4

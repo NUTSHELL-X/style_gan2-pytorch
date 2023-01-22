@@ -3,14 +3,19 @@ import torch.nn as nn
 from model import Generator
 from utils import plot_images
 import imageio
+import os
+from utils import config_parser
 
-start_c=256
-w_c=512
+parser=config_parser()
+args=parser.parse_args()
+start_c=args.start_c
+w_c=args.w_c
 batch_size=12
 device='cuda' if torch.cuda.is_available() else 'cpu'
-start_res=(5,8)
-gen=Generator(start_res=start_res,start_c=start_c).to(device)
-checkpoint=torch.load('MC_saved.pt')
+start_res=args.start_res
+gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c).to(device)
+model_path=args.model_path
+checkpoint=torch.load(model_path)
 gen.load_state_dict(checkpoint['gen_state_dict'])
 base_tensor=torch.ones((1,start_c,start_res[0],start_res[1])).to(device)
 # w=torch.randn((batch_size,w_c)).to(device)
@@ -26,5 +31,7 @@ for i in range(n_frames+1):
     image=gen([base_tensor,z]).squeeze().to('cpu').detach().permute(1,2,0).numpy()
     print(image.shape)
     images.append(image)
-
-imageio.mimsave('gif/generated_mc_landscape.gif',images,fps=20)
+gif_folder='gif'
+if not os.path.exists(gif_folder):
+    os.mkdir(gif_folder)
+imageio.mimsave(os.path.join(gif_folder,'generated_mc_landscape.gif'),images,fps=20)
