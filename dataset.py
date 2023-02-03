@@ -17,20 +17,30 @@ class MultiFolderDataset(Dataset):
         folder=os.path.expanduser(folder) # change "~/" to "/home/user/"
         self.transform=transform
         self.images=[]
+        self.class_idxes=[]
         class_idx=0
         for class_folder in os.listdir(folder):
             cur_folder=os.path.join(folder,class_folder)
             for image_path in os.listdir(cur_folder):
                 image=Image.open(os.path.join(cur_folder,image_path))
                 image=np.array(image)
-                self.images.append([image,class_idx])
+                self.images.append(image)
+                self.class_idxes.append(class_idx)
             class_idx+=1
-
+        
+        self.images_np_ndarray=np.ndarray(shape=(len(self.images),)+self.images[0].shape)
+        for i in range(0,len(self.images)):
+            self.images_np_ndarray[i] = self.images[i]
+        print(self.images_np_ndarray.shape)
+        
     def __len__(self):
         return len(self.images)
     
     def __getitem__(self, idx):
-        image,class_idx=self.images[idx]
+        # image=self.images_np_ndarray[idx]
+        # print('image',type(image),image.shape)
+        image=self.images[idx]
+        class_idx=self.class_idxes[idx]
         if self.transform:
             image=self.transform(image=image)['image']
         return image,class_idx
