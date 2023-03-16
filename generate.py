@@ -34,4 +34,4 @@ for i in range(n_frames+1):
 gif_folder='gif'
 if not os.path.exists(gif_folder):
     os.mkdir(gif_folder)
-imageio.mimsave(os.path.join(gif_folder,'generated_mc_landscape.gif'),images,fps=20)
+imageio.mimsave(os.path.join(gif_folder,'generated.gif'),images,fps=20)

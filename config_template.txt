@@ -1,0 +1,14 @@
+model_path=
+generated_image_folder=
+dataset_path=
+epoch=
+dtype=
+start_res=
+upscale_times=
+start_c=
+w_c=
+batch_size=
+lr=
+lr_decay=
+milestones=
+gamma=

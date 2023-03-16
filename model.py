@@ -146,17 +146,18 @@ class Generator(nn.Module):
         x,w=inputs
         w=self.map_net(w)
         rgb_out=None
+        bc=x.shape[0]
         for i in range(self.steps+1):
             height=self.start_res[0]*2**i
             width=self.start_res[1]*2**i
             if i==0:
-                noise=torch.randn((1,1,height,width)).to(device)
+                noise=torch.randn((bc,1,height,width)).to(device)
                 x=self.g_blocks[0]([x,w,noise])
                 rgb_out=self.to_rgbs[0](x)
             else:
-                noise=torch.randn((1,1,height,width)).to(device)
+                noise=torch.randn((bc,1,height,width)).to(device)
                 x=self.g_blocks[2*i-1]([x,w,noise])
-                noise=torch.randn((1,1,height,width)).to(device)
+                noise=torch.randn((bc,1,height,width)).to(device)
                 x=self.g_blocks[2*i]([x,w,noise])
                 rgb_out=self.up_samples[i-1](rgb_out)
                 rgb_out+=self.to_rgbs[i](x)
