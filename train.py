@@ -18,7 +18,6 @@ parser=config_parser()
 args=parser.parse_args()
 batch_size=args.batch_size
 start_res=args.start_res
-print(start_res,type(start_res))
 start_c=args.start_c
 w_c=args.w_c
 save_images=True
@@ -76,7 +75,6 @@ def train_fn(epochs):
             print('d_loss:',d_loss.item())
             d_loss.backward()
             opt_disc.step()
-            # print("1:",next(iter(disc.parameters())).data)
             #train gen
             opt_gen.zero_grad()
             # g_loss=-torch.mean(disc(fake))
@@ -119,17 +117,12 @@ def train_fn_auto_scaler(epochs):
             scaler_gen.update()
         
         if save_images:
-            save_image(fake.cpu().detach()[0],generated_image_path+f'generated_img_{total_epochs+i}.jpg')
+            save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}.jpg')
 
 if __name__=='__main__':
     epochs=args.epoch
     train_fn(epochs)
     total_epochs+=epochs
-    # n_examples=4
-    # latent=torch.randn(n_examples,256).to(device)
-    # generated_imgs=gen(latent).cpu().detach()
-    # for i in range(n_examples):
-    #     save_image(generated_imgs[0],f'generated_img/generated_img_{3}_{i}.jpg')
     torch.save({
         'disc_state_dict':disc.state_dict(),
         'gen_state_dict':gen.state_dict(),

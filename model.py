@@ -56,7 +56,7 @@ class AddBias(nn.Module):
     def forward(self,x):
         return x+self.b
 
-class AdaIN(nn.Module):     #Adaptive InstanceNormalization,but std affine only
+class AdaIN(nn.Module):     
     def __init__(self,x_c,w_c,gain=1,**kwargs):
         super().__init__()
         self.x_c=x_c

@@ -85,5 +85,5 @@ def create_dataloader(res,batch_size):
     )
     # ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
     ds=MultiFolderDataset(folder=ds_folder,transform=transforms)
-    dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=4)
+    dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=0)
     return dl
