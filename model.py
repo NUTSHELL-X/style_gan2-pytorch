@@ -221,16 +221,16 @@ class Discriminator(nn.Module):
 
 if __name__=='__main__':
     device='cuda'
-    start_res=[5,8]
+    start_res=[4,4]
     batch_size=2
     start_c=512
     w_c=512
     x=torch.randn((batch_size,start_c,start_res[0],start_res[1])).to(device)
     w=torch.randn((batch_size,w_c)).to(device)
-    gen=Generator(start_res=start_res,start_c=start_c).to(device)
+    gen=Generator(start_res=start_res,start_c=start_c,steps=4).to(device)
     out=gen([x,w])
     print('out shape:',out.shape)
-    disc=Discriminator(start_res=start_res,start_c=start_c).to(device)
+    disc=Discriminator(start_res=start_res,start_c=start_c,steps=4).to(device)
     disc_out=disc(out)
     print(disc_out)
     
