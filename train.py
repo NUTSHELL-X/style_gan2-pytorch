@@ -31,8 +31,8 @@ generated_image_folder=args.generated_image_folder
 # milestones=args.milestones
 # print(milestones)
 device=args.device if torch.cuda.is_available() else "cpu"
-gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c).to(device)
-disc=Discriminator(start_res=start_res,start_c=start_c).to(device)
+gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c,steps=upscale_times).to(device)
+disc=Discriminator(start_res=start_res,start_c=start_c,steps=upscale_times).to(device)
 opt_gen=optim.Adam(gen.parameters(),lr=lr)
 opt_disc=optim.Adam(disc.parameters(),lr=lr)
 sche_gen=MultiStepLR(opt_gen, milestones=[30,80,150,200,250], gamma=0.7)
