@@ -31,7 +31,7 @@ final_w=start_res[1]*2**upscale_times
 generated_image_folder=args.generated_image_folder
 # milestones=args.milestones
 # print(milestones)
-device='cuda' if torch.cuda.is_available() else "cpu"
+device=args.device if torch.cuda.is_available() else "cpu"
 gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c).to(device)
 disc=Discriminator(start_res=start_res,start_c=start_c).to(device)
 opt_gen=optim.Adam(gen.parameters(),lr=lr)
@@ -84,7 +84,10 @@ def train_fn(epochs):
             print('g_loss',g_loss.item())
             g_loss.backward()
             opt_gen.step()
-        
+
+            if idx%600 == 0:
+                save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}_{idx}.jpg')
+                
         if save_images:
             if not os.path.exists(generated_image_folder):
                 os.mkdir(generated_image_folder)

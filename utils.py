@@ -34,6 +34,7 @@ def config_parser():
     import configargparse
     parser=configargparse.ArgumentParser()
     parser.add_argument('--config',is_config_file=True,help='config file path',default='config.txt')
+    parser.add_argument('--device',type=str)
     parser.add_argument('--model_path',type=str) # path to save weights(.pt file)
     parser.add_argument('--generated_image_folder',type=str) # path to save generated images(.jpg file) 
     parser.add_argument('--dataset_path',type=str) # path containing dataset

@@ -1,8 +1,11 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from utils import config_parser
 
-device='cuda' if torch.cuda.is_available() else "cpu"
+parser=config_parser()
+args=parser.parse_args()
+device=args.device if torch.cuda.is_available() else "cpu"
 def fade_in(alpha,a,b):
     return alpha*a+(1.0-alpha)*b
 

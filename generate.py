@@ -11,7 +11,7 @@ args=parser.parse_args()
 start_c=args.start_c
 w_c=args.w_c
 batch_size=12
-device='cuda' if torch.cuda.is_available() else 'cpu'
+device=args.device if torch.cuda.is_available() else 'cpu'
 start_res=args.start_res
 gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c).to(device)
 model_path=args.model_path
@@ -23,15 +23,15 @@ base_tensor=torch.ones((1,start_c,start_res[0],start_res[1])).to(device)
 # plot_images(images)
 x=torch.randn((1,w_c)).to(device)
 y=torch.randn((1,w_c)).to(device)
+print(x,y)
 n_frames=200
 images=[]
 for i in range(n_frames+1):
     a=i/n_frames
     z=a*x+(1-a)*y
     image=gen([base_tensor,z]).squeeze().to('cpu').detach().permute(1,2,0).numpy()
-    print(image.shape)
     images.append(image)
 gif_folder='gif'
 if not os.path.exists(gif_folder):
     os.mkdir(gif_folder)
-imageio.mimsave(os.path.join(gif_folder,'generated.gif'),images,fps=20)
+imageio.mimsave(os.path.join(gif_folder,'anime_generated.gif'),images,fps=20)

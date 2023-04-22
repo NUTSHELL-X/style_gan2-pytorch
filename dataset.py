@@ -47,7 +47,7 @@ class MultiFolderDataset(Dataset):
     
 class SingleFolderDataset(Dataset): #返回一个Dataset的实例，用于读取单个文件夹内的图片
     def __init__(self,folder,transform):
-        self.folder=folder
+        self.folder=os.path.expanduser(folder)
         self.transform=transform
 
     def __len__(self):
@@ -58,7 +58,7 @@ class SingleFolderDataset(Dataset): #返回一个Dataset的实例，用于读取
         image=np.array(image)
         if self.transform:
             image=self.transform(image=image)['image']
-        return image
+        return image,0
 
 class Transforms:
     def __init__(self, transforms: A.Compose):
@@ -84,6 +84,6 @@ def create_dataloader(res,batch_size):
         ]
     )
     # ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
-    ds=MultiFolderDataset(folder=ds_folder,transform=transforms)
+    ds=SingleFolderDataset(folder=ds_folder,transform=transforms)
     dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=4)
     return dl
