@@ -1,14 +1,24 @@
-model_path=
-generated_image_folder=
-dataset_path=
-epoch=
-dtype=
-start_res=
-upscale_times=
-start_c=
-w_c=
-batch_size=
-lr=
-lr_decay=
-milestones=
-gamma=
+# 保存model的路径
+model_path="model.pt"
+# 保存训练过程中生成图片的路径
+generated_image_folder="./generated"
+# dataset所在路径
+dataset_path="./dataset"
+epoch=10
+# dtype选择（功能还未完成）
+dtype="fp32"
+# 起始的分辨率
+start_res=[4,4]
+# 上采样2倍的次数
+upscale_times=5
+# 初始的通道数
+start_c=256
+# 用于AdaIN的weight的通道数
+w_c=256
+batch_size=8
+# learning rate
+lr=1e-4
+# 以下三个功能还没完成，随意填即可
+lr_decay="True"
+milestones=[50,100]
+gamma=0.9
