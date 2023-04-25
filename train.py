@@ -33,7 +33,7 @@ generated_image_folder=args.generated_image_folder
 device=args.device if torch.cuda.is_available() else "cpu"
 gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c,steps=upscale_times).to(device)
 disc=Discriminator(start_res=start_res,start_c=start_c,steps=upscale_times).to(device)
-opt_gen=optim.Adam(gen.parameters(),lr=lr)
+opt_gen=optim.Adam(gen.parameters(),lr=2*lr)
 opt_disc=optim.Adam(disc.parameters(),lr=lr)
 sche_gen=MultiStepLR(opt_gen, milestones=[30,80,150,200,250], gamma=0.7)
 sche_disc=MultiStepLR(opt_disc, milestones=[30,80,150,200,250], gamma=0.7)
@@ -74,6 +74,7 @@ def train_fn(epochs):
             d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device))
             print('d_loss:',d_loss.item())
             d_loss.backward()
+            torch.nn.utils.clip_grad_norm_(disc.parameters(), 1.)
             opt_disc.step()
             #train gen
             opt_gen.zero_grad()
@@ -81,6 +82,7 @@ def train_fn(epochs):
             g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device))
             print('g_loss',g_loss.item())
             g_loss.backward()
+            torch.nn.utils.clip_grad_norm_(gen.parameters(), 1.)
             opt_gen.step()
 
             if idx%600 == 0:

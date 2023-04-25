@@ -83,7 +83,8 @@ def create_dataloader(res,batch_size):
             ToTensorV2(),
         ]
     )
-    ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
+    # ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
     # ds=MultiFolderDataset(folder=ds_folder,transform=transforms)
-    dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=0)
+    ds=SingleFolderDataset(folder=ds_folder,transform=transforms)
+    dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=6)
     return dl
