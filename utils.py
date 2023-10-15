@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset,DataLoader
 from torchvision.io import read_image,ImageReadMode
 import os
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -34,10 +34,11 @@ def config_parser():
     import configargparse
     parser=configargparse.ArgumentParser()
     parser.add_argument('--config',is_config_file=True,help='config file path',default='config.txt')
-    parser.add_argument('--device',type=str)
+    parser.add_argument('--device',type=str,default='cuda:0')
     parser.add_argument('--model_path',type=str) # path to save weights(.pt file)
     parser.add_argument('--generated_image_folder',type=str) # path to save generated images(.jpg file) 
     parser.add_argument('--dataset_path',type=str) # path containing dataset
+    parser.add_argument('--multi_folder',type=bool,default=True) # path containing dataset
     parser.add_argument('--epoch',type=int)
     parser.add_argument('--dtype',type=str) # data type used for training(fp16,fp32,mixed)
     parser.add_argument('--start_res',nargs='+',type=int) # 

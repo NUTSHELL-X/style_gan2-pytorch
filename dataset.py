@@ -67,7 +67,7 @@ class Transforms:
     def __call__(self, img, *args, **kwargs):
         return self.transforms(image=np.array(img))['image']
 
-def create_dataloader(res,batch_size):
+def create_dataloader(res,batch_size,multi_folder=True):
     if isinstance(res,list) or isinstance(res,tuple):
         h,w=res
     else:
@@ -83,8 +83,9 @@ def create_dataloader(res,batch_size):
             ToTensorV2(),
         ]
     )
-    # ds=ImageFolder(root=ds_folder,transform=Transforms(transforms))
-    # ds=MultiFolderDataset(folder=ds_folder,transform=transforms)
-    ds=SingleFolderDataset(folder=ds_folder,transform=transforms)
+    if multi_folder:
+        ds=MultiFolderDataset(folder=ds_folder,transform=transforms)
+    else:
+        ds=SingleFolderDataset(folder=ds_folder,transform=transforms)
     dl=DataLoader(dataset=ds,batch_size=batch_size,shuffle=True,drop_last=True,pin_memory=True,num_workers=6)
     return dl

@@ -31,6 +31,7 @@ generated_image_folder=args.generated_image_folder
 # milestones=args.milestones
 # print(milestones)
 device=args.device if torch.cuda.is_available() else "cpu"
+print('using device {device}'.format(device=device))
 gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c,steps=upscale_times).to(device)
 disc=Discriminator(start_res=start_res,start_c=start_c,steps=upscale_times).to(device)
 opt_gen=optim.Adam(gen.parameters(),lr=2*lr)
@@ -86,12 +87,10 @@ def train_fn(epochs):
             opt_gen.step()
 
             if idx%600 == 0:
-                save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}_{idx}.jpg')
+                save_image(fake.cpu().detach()[0],os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}_{idx}.jpg'))
                 
         if save_images:
-            if not os.path.exists(generated_image_folder):
-                os.mkdir(generated_image_folder)
-            save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}.jpg')
+            save_image(fake.cpu().detach()[0],os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}.jpg'))
 
 def train_fn_auto_scaler(epochs):
     for i in range(epochs):
@@ -126,6 +125,8 @@ def train_fn_auto_scaler(epochs):
 
 if __name__=='__main__':
     epochs=args.epoch
+    if not os.path.exists(generated_image_folder) and save_images:
+        os.mkdir(generated_image_folder)
     train_fn(epochs)
     total_epochs+=epochs
     torch.save({
