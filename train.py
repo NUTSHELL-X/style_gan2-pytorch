@@ -27,6 +27,7 @@ lr=args.lr
 upscale_times=args.upscale_times
 final_h=start_res[0]*2**upscale_times
 final_w=start_res[1]*2**upscale_times
+dataset_type = args.dataset_type
 generated_image_folder=args.generated_image_folder
 # milestones=args.milestones
 # print(milestones)
@@ -60,7 +61,7 @@ base_tensor=torch.ones((batch_size,start_c,start_res[0],start_res[1])).to(device
 if auto_scale:
     scaler_disc = torch.cuda.amp.GradScaler()
     scaler_gen = torch.cuda.amp.GradScaler()
-dataloader=create_dataloader((final_h,final_w),batch_size)
+dataloader=create_dataloader((final_h,final_w),batch_size,dataset_type)
 def train_fn(epochs):
     for i in range(epochs):
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
@@ -73,7 +74,7 @@ def train_fn(epochs):
             disc_fake=disc(fake.detach())
             # d_loss=-torch.mean(disc(real))+torch.mean(disc(fake.detach()))
             d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device))
-            print('d_loss:',d_loss.item())
+            # print('d_loss:',d_loss.item())
             d_loss.backward()
             torch.nn.utils.clip_grad_norm_(disc.parameters(), 1.)
             opt_disc.step()
@@ -81,14 +82,15 @@ def train_fn(epochs):
             opt_gen.zero_grad()
             # g_loss=-torch.mean(disc(fake))
             g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device))
-            print('g_loss',g_loss.item())
+            # print('g_loss',g_loss.item())
             g_loss.backward()
             torch.nn.utils.clip_grad_norm_(gen.parameters(), 1.)
             opt_gen.step()
 
             if idx%600 == 0:
                 save_image(fake.cpu().detach()[0],os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}_{idx}.jpg'))
-                
+        print('d_loss:',d_loss.item())
+        print('g_loss',g_loss.item())
         if save_images:
             save_image(fake.cpu().detach()[0],os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}.jpg'))
 

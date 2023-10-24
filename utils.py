@@ -38,7 +38,7 @@ def config_parser():
     parser.add_argument('--model_path',type=str) # path to save weights(.pt file)
     parser.add_argument('--generated_image_folder',type=str) # path to save generated images(.jpg file) 
     parser.add_argument('--dataset_path',type=str) # path containing dataset
-    parser.add_argument('--multi_folder',type=bool,default=True) # path containing dataset
+    parser.add_argument('--dataset_type',type=str,default='image_folder') # path containing dataset
     parser.add_argument('--epoch',type=int)
     parser.add_argument('--dtype',type=str) # data type used for training(fp16,fp32,mixed)
     parser.add_argument('--start_res',nargs='+',type=int) # 
