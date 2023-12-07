@@ -12,7 +12,10 @@ import torch.optim as optim
 from torchvision.utils import save_image
 from torch.cuda.amp import autocast
 from torch.optim.lr_scheduler import MultiStepLR
-from utils import config_parser
+from options import config_parser
+
+torch.backends.cudnn.enabled = True
+torch.backends.cudnn.benchmark = True
 
 parser=config_parser()
 args=parser.parse_args()
