@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from utils import config_parser
+from options import config_parser
 
 parser=config_parser()
 args=parser.parse_args()

@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy
 from torchvision import datasets,transforms
 import matplotlib.pyplot as plt
-from utils import plot_images
+from utils import plot_images,save_weights,save_training_params,print_networks
 import os
 from tqdm import tqdm
 from dataset import create_dataloader
@@ -11,7 +11,7 @@ from model import Generator,Discriminator
 import torch.optim as optim
 from torchvision.utils import save_image
 from torch.cuda.amp import autocast
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR,StepLR
 from options import config_parser
 
 torch.backends.cudnn.enabled = True
@@ -21,8 +21,8 @@ parser=config_parser()
 args=parser.parse_args()
 batch_size=args.batch_size
 start_res=args.start_res
-start_c=args.start_c
-w_c=args.w_c
+start_channels=args.start_channels
+w_channels=args.w_channels
 save_images=True
 auto_scale=True
 model_path=args.model_path
@@ -32,45 +32,45 @@ final_h=start_res[0]*2**upscale_times
 final_w=start_res[1]*2**upscale_times
 dataset_type = args.dataset_type
 generated_image_folder=args.generated_image_folder
-# milestones=args.milestones
-# print(milestones)
 device=args.device if torch.cuda.is_available() else "cpu"
 print('using device {device}'.format(device=device))
-gen=Generator(start_res=start_res,w_c=w_c,start_c=start_c,steps=upscale_times).to(device)
-disc=Discriminator(start_res=start_res,start_c=start_c,steps=upscale_times).to(device)
-opt_gen=optim.Adam(gen.parameters(),lr=2*lr)
+gen=Generator(start_res=start_res,w_c=w_channels,start_c=start_channels,steps=upscale_times).to(device)
+disc=Discriminator(start_res=start_res,start_c=start_channels,steps=upscale_times).to(device)
+opt_gen=optim.Adam(gen.parameters(),lr=lr)
 opt_disc=optim.Adam(disc.parameters(),lr=lr)
-sche_gen=MultiStepLR(opt_gen, milestones=[30,80,150,200,250], gamma=0.7)
-sche_disc=MultiStepLR(opt_disc, milestones=[30,80,150,200,250], gamma=0.7)
-total_epochs=0
-if os.path.exists(model_path):
-    print('loading data from saved weights')
-    checkpoint=torch.load(model_path)
-    disc.load_state_dict(checkpoint['disc_state_dict'])
-    gen.load_state_dict(checkpoint['gen_state_dict'])
-    opt_disc.load_state_dict(checkpoint['disc_opt_state_dict'])
-    opt_gen.load_state_dict(checkpoint['gen_opt_state_dict'])
-    sche_gen.load_state_dict(checkpoint['sche_gen_state_dict'])
-    sche_disc.load_state_dict(checkpoint['sche_disc_state_dict'])
-    total_epochs=checkpoint['total_epochs']
-    print('total_epochs:',total_epochs)
-else:
-    print('initializing from scratch')
+sche_gen=StepLR(opt_gen,step_size=args.lr_step_size,gamma=args.gamma)
+sche_disc=StepLR(opt_disc,step_size=args.lr_step_size,gamma=args.gamma)
+# if os.path.exists(model_path):
+#     print('loading data from saved weights')
+#     checkpoint=torch.load(model_path)
+#     disc.load_state_dict(checkpoint['disc_state_dict'])
+#     gen.load_state_dict(checkpoint['gen_state_dict'])
+#     opt_disc.load_state_dict(checkpoint['disc_opt_state_dict'])
+#     opt_gen.load_state_dict(checkpoint['gen_opt_state_dict'])
+#     sche_gen.load_state_dict(checkpoint['sche_gen_state_dict'])
+#     sche_disc.load_state_dict(checkpoint['sche_disc_state_dict'])
+#     total_epochs=checkpoint['total_epochs']
+#     print('total_epochs:',total_epochs)
+# else:
+#     print('initializing from scratch')
 
 scaler_gen=torch.cuda.amp.GradScaler()
 scaler_disc=torch.cuda.amp.GradScaler()
 loss_fn=nn.BCEWithLogitsLoss()
-base_tensor=torch.ones((batch_size,start_c,start_res[0],start_res[1])).to(device)
+base_tensor=torch.ones((batch_size,start_channels,start_res[0],start_res[1])).to(device)
 if auto_scale:
     scaler_disc = torch.cuda.amp.GradScaler()
     scaler_gen = torch.cuda.amp.GradScaler()
 dataloader=create_dataloader((final_h,final_w),batch_size,dataset_type)
+def train_gen(net_gen,net_disc,opt_gen,opt,_disc):
+    pass
+
 def train_fn(epochs):
     for i in range(epochs):
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
             real=real.to(device)
-            latent=torch.randn(batch_size,w_c).to(device)
+            latent=torch.randn(batch_size,w_channels).to(device)
             fake=gen([base_tensor,latent])
             opt_disc.zero_grad()
             disc_real=disc(real)
@@ -102,7 +102,7 @@ def train_fn_auto_scaler(epochs):
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
             real=real.to(device)
-            latent=torch.randn(batch_size,w_c).to(device)
+            latent=torch.randn(batch_size,w_channels).to(device)
             opt_disc.zero_grad()
             with torch.cuda.amp.autocast():
                 fake=gen([base_tensor,latent])
@@ -129,17 +129,32 @@ def train_fn_auto_scaler(epochs):
             save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}.jpg')
 
 if __name__=='__main__':
-    epochs=args.epoch
+    epochs=args.epochs
     if not os.path.exists(generated_image_folder) and save_images:
         os.mkdir(generated_image_folder)
+    if not os.path.exists(args.save_dir):
+        os.mkdir(args.save_dir)
+    if args.continues: # load weights
+        if len(args.gpus) > 1:
+            gen.module.load_state_dict(torch.load(args.gen_weights_path)) # 可能还有问题
+            disc.module.load_state_dict(args.disc_weights_path)
+        else:
+            gen.load_state_dict(args.gen_weights_path)
+            disc.load_state_dict(args.disc_weights_path)
+        print('loaded saved weights ; Generator:{},Discriminator:{}'.format(args.gen_weights_path,args.disc_weights_path))
+        training_params=torch.load(args.training_params_path)
+        opt_disc.load_state_dict(training_params['opt_disc_state_dict'])
+        opt_gen.load_state_dict(training_params['opt_gen_state_dict'])
+        # sche_gen.load_state_dict(training_params['sche_gen_state_dict'])
+        # sche_disc.load_state_dict(training_params['sche_disc_state_dict'])
+        total_epochs=training_params['total_epochs']
+        print('total_epochs:',total_epochs)
+    else:
+        total_epochs=0
+        print('initializing from scratch')
     train_fn(epochs)
     total_epochs+=epochs
-    torch.save({
-        'disc_state_dict':disc.state_dict(),
-        'gen_state_dict':gen.state_dict(),
-        'disc_opt_state_dict':opt_disc.state_dict(),
-        'gen_opt_state_dict':opt_gen.state_dict(),
-        'total_epochs':total_epochs,
-        'sche_gen_state_dict':sche_gen.state_dict(),
-        'sche_disc_state_dict':sche_disc.state_dict(),
-    },model_path)
+
+    save_weights(gen,args.gen_weights_path,args.gpus)
+    save_weights(disc,args.disc_weights_path,args.gpus)
+    save_training_params(opt_gen,opt_disc,total_epochs,args.training_params_path)

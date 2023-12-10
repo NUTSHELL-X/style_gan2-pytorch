@@ -1,10 +1,18 @@
 # 保存model的路径
 model_path="model.pt"
+# 训练过程日志保存路径
+save_dir = ""
 # 保存训练过程中生成图片的路径
 generated_image_folder="./generated"
+
+gen_weights_path = "./exp/gen.pth"
+disc_weights_path = "./exp/disc.pth"
+
+# 优化器状态保存路径
+training_params_path = "./exp/training_params.pt"
 # dataset所在路径
 dataset_path="./dataset"
-epoch=10
+epochs=10
 # dtype选择（功能还未完成）
 dtype="fp32"
 # 起始的分辨率
@@ -12,9 +20,9 @@ start_res=[4,4]
 # 上采样2倍的次数
 upscale_times=5
 # 初始的通道数
-start_c=256
+start_channels=256
 # 用于AdaIN的weight的通道数
-w_c=256
+w_channels=256
 batch_size=8
 # learning rate
 lr=1e-4
@@ -22,3 +30,4 @@ lr=1e-4
 lr_decay="True"
 milestones=[50,100]
 gamma=0.9
+gpus=[0]

@@ -28,13 +28,23 @@ def plot_images(images,max_num=16,n_col=4):
 def print_networks(net):
     """Print the total number of parameters in the network and (if verbose) network architecture
 
-    Parameters:
-        verbose (bool) -- if verbose: print the network architecture
     """
-    print('---------- Networks initialized -------------')
     num_params = 0
     for param in net.parameters():
         num_params += param.numel()
     print(net)
     print('[Network] Total number of parameters : %.3f M' % (num_params / 1e6))
     print('-----------------------------------------------')
+
+def save_weights(net,save_path,gpus):
+    if len(gpus) > 1 and torch.cuda.is_available():
+        torch.save(net.module.cpu().state_dict(), save_path)
+    else:
+        torch.save(net.cpu().state_dict(), save_path)
+
+def save_training_params(opt_gen,opt_disc,total_epochs,save_path):
+    torch.save({
+        'opt_disc_state_dict':opt_disc.state_dict(),
+        'opt_gen_state_dict':opt_gen.state_dict(),
+        'total_epochs':total_epochs,
+    },save_path)

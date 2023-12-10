@@ -6,7 +6,7 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from torchvision.datasets import ImageFolder
-from utils import config_parser
+from options import config_parser
 
 parser=config_parser()
 args=parser.parse_args()
