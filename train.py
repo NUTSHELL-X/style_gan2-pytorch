@@ -31,15 +31,10 @@ upscale_times=args.upscale_times
 final_h=start_res[0]*2**upscale_times
 final_w=start_res[1]*2**upscale_times
 dataset_type = args.dataset_type
+dtype = torch.float16 if args.dtype=='float16' else torch.float32
 generated_image_folder=args.generated_image_folder
 device=args.device if torch.cuda.is_available() else "cpu"
 print('using device {device}'.format(device=device))
-gen=Generator(start_res=start_res,w_c=w_channels,start_c=start_channels,steps=upscale_times).to(device)
-disc=Discriminator(start_res=start_res,start_c=start_channels,steps=upscale_times).to(device)
-opt_gen=optim.Adam(gen.parameters(),lr=lr)
-opt_disc=optim.Adam(disc.parameters(),lr=lr)
-sche_gen=StepLR(opt_gen,step_size=args.lr_step_size,gamma=args.gamma)
-sche_disc=StepLR(opt_disc,step_size=args.lr_step_size,gamma=args.gamma)
 # if os.path.exists(model_path):
 #     print('loading data from saved weights')
 #     checkpoint=torch.load(model_path)
@@ -57,7 +52,7 @@ sche_disc=StepLR(opt_disc,step_size=args.lr_step_size,gamma=args.gamma)
 scaler_gen=torch.cuda.amp.GradScaler()
 scaler_disc=torch.cuda.amp.GradScaler()
 loss_fn=nn.BCEWithLogitsLoss()
-base_tensor=torch.ones((batch_size,start_channels,start_res[0],start_res[1])).to(device)
+base_tensor=torch.ones((batch_size,start_channels,start_res[0],start_res[1])).to(device).to(dtype)
 if auto_scale:
     scaler_disc = torch.cuda.amp.GradScaler()
     scaler_gen = torch.cuda.amp.GradScaler()
@@ -65,12 +60,14 @@ dataloader=create_dataloader((final_h,final_w),batch_size,dataset_type)
 def train_gen(net_gen,net_disc,opt_gen,opt,_disc):
     pass
 
-def train_fn(epochs):
+def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,epochs,dtype):
     for i in range(epochs):
+        print('current generator learning rate: ',sche_gen.get_last_lr())
+        print('current discriminator learning rate: ',sche_disc.get_last_lr())
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
-            real=real.to(device)
-            latent=torch.randn(batch_size,w_channels).to(device)
+            real=real.to(device).to(dtype)
+            latent=torch.randn(batch_size,w_channels).to(device).to(dtype)
             fake=gen([base_tensor,latent])
             opt_disc.zero_grad()
             disc_real=disc(real)
@@ -90,46 +87,53 @@ def train_fn(epochs):
             torch.nn.utils.clip_grad_norm_(gen.parameters(), 1.)
             opt_gen.step()
 
-            if idx%600 == 0:
-                save_image(fake.cpu().detach()[0],os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}_{idx}.jpg'))
+            if idx%300 == 0:
+                save_image(fake.cpu().detach()[0].to(torch.float32),os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}_{idx}.jpg'))
         print('d_loss:',d_loss.item())
         print('g_loss',g_loss.item())
+        sche_gen.step()
+        sche_disc.step()
         if save_images:
-            save_image(fake.cpu().detach()[0],os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}.jpg'))
+            save_image(fake.cpu().detach()[0].to(torch.float32),os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}.jpg'))
 
-def train_fn_auto_scaler(epochs):
-    for i in range(epochs):
-        for idx,(real,labels) in tqdm(enumerate(dataloader)):
-            #train disc
-            real=real.to(device)
-            latent=torch.randn(batch_size,w_channels).to(device)
-            opt_disc.zero_grad()
-            with torch.cuda.amp.autocast():
-                fake=gen([base_tensor,latent])
-                disc_real=disc(real)
-                disc_fake=disc(fake.detach())
-                # d_loss=-torch.mean(disc(real))+torch.mean(disc(fake.detach()))
-                d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device))
-            print('d_loss:',d_loss.item())
-            scaler_disc.scale(d_loss).backward()
-            scaler_disc.step(opt_disc)
-            scaler_disc.update()
-            # print("1:",next(iter(disc.parameters())).data)
-            #train gen
-            opt_gen.zero_grad()
-            with torch.cuda.amp.autocast():
-                # g_loss=-torch.mean(disc(fake))
-                g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device))
-            print('g_loss',g_loss.item())
-            scaler_gen.scale(g_loss).backward()
-            scaler_gen.step(opt_gen)
-            scaler_gen.update()
+# def train_fn_auto_scaler(epochs):
+#     for i in range(epochs):
+#         for idx,(real,labels) in tqdm(enumerate(dataloader)):
+#             #train disc
+#             real=real.to(device)
+#             latent=torch.randn(batch_size,w_channels).to(device)
+#             opt_disc.zero_grad()
+#             with torch.cuda.amp.autocast():
+#                 fake=gen([base_tensor,latent])
+#                 disc_real=disc(real)
+#                 disc_fake=disc(fake.detach())
+#                 # d_loss=-torch.mean(disc(real))+torch.mean(disc(fake.detach()))
+#                 d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device))
+#             print('d_loss:',d_loss.item())
+#             scaler_disc.scale(d_loss).backward()
+#             scaler_disc.step(opt_disc)
+#             scaler_disc.update()
+#             # print("1:",next(iter(disc.parameters())).data)
+#             #train gen
+#             opt_gen.zero_grad()
+#             with torch.cuda.amp.autocast():
+#                 # g_loss=-torch.mean(disc(fake))
+#                 g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device))
+#             print('g_loss',g_loss.item())
+#             scaler_gen.scale(g_loss).backward()
+#             scaler_gen.step(opt_gen)
+#             scaler_gen.update()
         
-        if save_images:
-            save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}.jpg')
+#         if save_images:
+#             save_image(fake.cpu().detach()[0],generated_image_folder+f'generated_img_{total_epochs+i}.jpg')
 
 if __name__=='__main__':
     epochs=args.epochs
+    print('using dtype: ',dtype)
+    gen=Generator(start_res=2*start_res,w_c=w_channels,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
+    disc=Discriminator(start_res=start_res,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
+    opt_gen=optim.Adam(gen.parameters(),lr=lr)
+    opt_disc=optim.Adam(disc.parameters(),lr=lr)
     if not os.path.exists(generated_image_folder) and save_images:
         os.mkdir(generated_image_folder)
     if not os.path.exists(args.save_dir):
@@ -137,10 +141,10 @@ if __name__=='__main__':
     if args.continues: # load weights
         if len(args.gpus) > 1:
             gen.module.load_state_dict(torch.load(args.gen_weights_path)) # 可能还有问题
-            disc.module.load_state_dict(args.disc_weights_path)
+            disc.module.load_state_dict(torch.load(args.disc_weights_path))
         else:
-            gen.load_state_dict(args.gen_weights_path)
-            disc.load_state_dict(args.disc_weights_path)
+            gen.load_state_dict(torch.load(args.gen_weights_path))
+            disc.load_state_dict(torch.load(args.disc_weights_path))
         print('loaded saved weights ; Generator:{},Discriminator:{}'.format(args.gen_weights_path,args.disc_weights_path))
         training_params=torch.load(args.training_params_path)
         opt_disc.load_state_dict(training_params['opt_disc_state_dict'])
@@ -152,7 +156,10 @@ if __name__=='__main__':
     else:
         total_epochs=0
         print('initializing from scratch')
-    train_fn(epochs)
+    sche_gen=StepLR(opt_gen,step_size=args.lr_step_size,gamma=args.gamma)
+    sche_disc=StepLR(opt_disc,step_size=args.lr_step_size,gamma=args.gamma)
+    print('total_epochs:',total_epochs)
+    train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,epochs,dtype)
     total_epochs+=epochs
 
     save_weights(gen,args.gen_weights_path,args.gpus)

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from options import config_parser
+from utils import print_networks
 
 parser=config_parser()
 args=parser.parse_args()
@@ -154,13 +155,13 @@ class Generator(nn.Module):
             height=self.start_res[0]*2**i
             width=self.start_res[1]*2**i
             if i==0:
-                noise=torch.randn((bc,1,height,width)).to(device)
+                noise=torch.randn((bc,1,height,width)).to(x.device).to(x.dtype)
                 x=self.g_blocks[0]([x,w,noise])
                 rgb_out=self.to_rgbs[0](x)
             else:
-                noise=torch.randn((bc,1,height,width)).to(device)
+                noise=torch.randn((bc,1,height,width)).to(x.device).to(x.dtype)
                 x=self.g_blocks[2*i-1]([x,w,noise])
-                noise=torch.randn((bc,1,height,width)).to(device)
+                noise=torch.randn((bc,1,height,width)).to(x.device).to(x.dtype)
                 x=self.g_blocks[2*i]([x,w,noise])
                 rgb_out=self.up_samples[i-1](rgb_out)
                 rgb_out+=self.to_rgbs[i](x)
@@ -228,12 +229,16 @@ if __name__=='__main__':
     batch_size=2
     start_c=512
     w_c=512
-    x=torch.randn((batch_size,start_c,start_res[0],start_res[1])).to(device)
-    w=torch.randn((batch_size,w_c)).to(device)
+    dtype = torch.float16 if args.dtype=='float16' else torch.float32
+    x=torch.randn((batch_size,start_c,start_res[0],start_res[1])).to(device).to(dtype)
+    w=torch.randn((batch_size,w_c)).to(device).to(dtype)
     gen=Generator(start_res=start_res,start_c=start_c,steps=4).to(device)
+    gen.to(dtype)
+    print_networks(gen)
     out=gen([x,w])
     print('out shape:',out.shape)
-    disc=Discriminator(start_res=start_res,start_c=start_c,steps=4).to(device)
+    disc=Discriminator(start_res=start_res,start_c=start_c,steps=4).to(device).to(dtype)
+    print_networks(disc)
     disc_out=disc(out)
     print(disc_out)
     

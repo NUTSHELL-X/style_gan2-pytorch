@@ -14,7 +14,7 @@ training_params_path = "./exp/training_params.pt"
 dataset_path="./dataset"
 epochs=10
 # dtype选择（功能还未完成）
-dtype="fp32"
+dtype="float32"
 # 起始的分辨率
 start_res=[4,4]
 # 上采样2倍的次数

@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset,DataLoader
 from torchvision.io import read_image,ImageReadMode
 import os
@@ -29,6 +30,12 @@ def print_networks(net):
     """Print the total number of parameters in the network and (if verbose) network architecture
 
     """
+    if not isinstance(net,nn.Module):
+        print('net type error')
+    print('net layers and weights:')
+    for name,param in net.named_parameters():
+        print('layer: ',name,'param dtype: ',param.dtype)
+    print('-----------------------------------------------')
     num_params = 0
     for param in net.parameters():
         num_params += param.numel()

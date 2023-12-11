@@ -1,4 +1,5 @@
 import configargparse
+import torch
 
 def config_parser():
     parser=configargparse.ArgumentParser()
