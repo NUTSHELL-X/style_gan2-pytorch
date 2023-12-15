@@ -23,8 +23,8 @@ batch_size=args.batch_size
 start_res=args.start_res
 start_channels=args.start_channels
 w_channels=args.w_channels
-save_images=True
-auto_scale=True
+save_images=args.save_images
+# auto_scale=True
 model_path=args.model_path
 lr=args.lr
 upscale_times=args.upscale_times
@@ -53,15 +53,16 @@ scaler_gen=torch.cuda.amp.GradScaler()
 scaler_disc=torch.cuda.amp.GradScaler()
 loss_fn=nn.BCEWithLogitsLoss()
 base_tensor=torch.ones((batch_size,start_channels,start_res[0],start_res[1])).to(device).to(dtype)
-if auto_scale:
-    scaler_disc = torch.cuda.amp.GradScaler()
-    scaler_gen = torch.cuda.amp.GradScaler()
+# if auto_scale:
+#     scaler_disc = torch.cuda.amp.GradScaler()
+#     scaler_gen = torch.cuda.amp.GradScaler()
 dataloader=create_dataloader((final_h,final_w),batch_size,dataset_type)
 def train_gen(net_gen,net_disc,opt_gen,opt,_disc):
     pass
 
-def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,epochs,dtype):
+def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,total_epochs,epochs,dtype):
     for i in range(epochs):
+        print('updating epoch: {}'.format(total_epochs+i))
         print('current generator learning rate: ',sche_gen.get_last_lr())
         print('current discriminator learning rate: ',sche_disc.get_last_lr())
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
@@ -73,7 +74,7 @@ def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,epochs,dtype):
             disc_real=disc(real)
             disc_fake=disc(fake.detach())
             # d_loss=-torch.mean(disc(real))+torch.mean(disc(fake.detach()))
-            d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device))
+            d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device).to(dtype))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device).to(dtype))
             # print('d_loss:',d_loss.item())
             d_loss.backward()
             torch.nn.utils.clip_grad_norm_(disc.parameters(), 1.)
@@ -81,16 +82,16 @@ def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,epochs,dtype):
             #train gen
             opt_gen.zero_grad()
             # g_loss=-torch.mean(disc(fake))
-            g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device))
+            g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device).to(dtype))
             # print('g_loss',g_loss.item())
             g_loss.backward()
             torch.nn.utils.clip_grad_norm_(gen.parameters(), 1.)
             opt_gen.step()
-
-            if idx%300 == 0:
+            if type(args.save_freq_inside_epoch) == int and idx%args.save_freq_inside_epoch == 0:
                 save_image(fake.cpu().detach()[0].to(torch.float32),os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}_{idx}.jpg'))
-        print('d_loss:',d_loss.item())
-        print('g_loss',g_loss.item())
+
+        print('d_loss: ',d_loss.item())
+        print('g_loss: ',g_loss.item())
         sche_gen.step()
         sche_disc.step()
         if save_images:
@@ -131,9 +132,12 @@ if __name__=='__main__':
     epochs=args.epochs
     print('using dtype: ',dtype)
     gen=Generator(start_res=2*start_res,w_c=w_channels,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
+    gen=torch.nn.DataParallel(gen,device_ids=args.gpus)
     disc=Discriminator(start_res=start_res,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
-    opt_gen=optim.Adam(gen.parameters(),lr=lr)
-    opt_disc=optim.Adam(disc.parameters(),lr=lr)
+    disc=torch.nn.DataParallel(disc,device_ids=args.gpus)
+    adam_eps = 1e-4 if dtype == torch.float16 else 1e-8
+    opt_gen=optim.Adam(gen.parameters(),lr=lr,eps=adam_eps)
+    opt_disc=optim.Adam(disc.parameters(),lr=lr,eps=adam_eps)
     if not os.path.exists(generated_image_folder) and save_images:
         os.mkdir(generated_image_folder)
     if not os.path.exists(args.save_dir):
@@ -159,7 +163,7 @@ if __name__=='__main__':
     sche_gen=StepLR(opt_gen,step_size=args.lr_step_size,gamma=args.gamma)
     sche_disc=StepLR(opt_disc,step_size=args.lr_step_size,gamma=args.gamma)
     print('total_epochs:',total_epochs)
-    train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,epochs,dtype)
+    train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,total_epochs,epochs,dtype)
     total_epochs+=epochs
 
     save_weights(gen,args.gen_weights_path,args.gpus)

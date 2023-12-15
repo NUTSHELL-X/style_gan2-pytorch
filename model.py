@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from options import config_parser
 from utils import print_networks
+# from torch.nn.parallel import DistributedDataParallel
 
 parser=config_parser()
 args=parser.parse_args()
@@ -234,9 +235,10 @@ if __name__=='__main__':
     w=torch.randn((batch_size,w_c)).to(device).to(dtype)
     gen=Generator(start_res=start_res,start_c=start_c,steps=4).to(device)
     gen.to(dtype)
+    gen=torch.nn.DataParallel(gen,device_ids=args.gpus)
     print_networks(gen)
     out=gen([x,w])
-    print('out shape:',out.shape)
+    print('out shape:',out.shape,out.device)
     disc=Discriminator(start_res=start_res,start_c=start_c,steps=4).to(device).to(dtype)
     print_networks(disc)
     disc_out=disc(out)
