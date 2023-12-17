@@ -15,6 +15,8 @@ def config_parser():
     parser.add_argument('--save_freq_inside_epoch',type=int) # frequency to save image inside a epoch
     parser.add_argument('--dataset_path',type=str) # path containing dataset
     parser.add_argument('--dataset_type',type=str,default='image_folder') # dataset type (see dataset.py)
+    parser.add_argument('--loss_fn_gen',type=str,default='BCE')
+    parser.add_argument('--loss_fn_disc',type=str,default='BCE')
     parser.add_argument('--epochs',type=int) # training epochs
     parser.add_argument('--dtype',type=str) # data type used for training(float16,float32)
     parser.add_argument('--start_res',nargs='+',type=int) # start resolution 

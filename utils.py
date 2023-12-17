@@ -43,6 +43,39 @@ def print_networks(net):
     print('[Network] Total number of parameters : %.3f M' % (num_params / 1e6))
     print('-----------------------------------------------')
 
+def BCE_loss_disc(disc_real,disc_fake):
+    loss_f = nn.BCEWithLogitsLoss()
+    bs = disc_real.shape[0]
+    device = disc_real.device
+    dtype= disc_real.dtype
+    ones = torch.ones(bs).to(device).to(dtype)
+    zeros = torch.zeros(bs).to(device).to(dtype)
+    loss = loss_f(disc_real,ones)+loss_f(disc_fake,zeros)
+
+    return loss
+
+def BCE_loss_gen(disc_fake):
+    loss_f = nn.BCEWithLogitsLoss()
+    bs = disc_fake.shape[0]
+    device = disc_fake.device
+    dtype = disc_fake.dtype
+    ones = torch.ones(bs).to(device).to(dtype)
+    loss = loss_f(disc_fake,ones)
+    
+    return loss 
+
+def WGAN_loss_disc(disc_real,disc_fake):
+    loss_f = torch.mean
+    loss = -loss_f(disc_real)+loss_f(disc_fake)
+
+    return loss 
+
+def WGAN_loss_gen(disc_fake):
+    loss_f = torch.mean
+    loss = -loss_f(disc_fake)
+
+    return loss
+
 def save_weights(net,save_path,gpus):
     if len(gpus) > 1 and torch.cuda.is_available():
         torch.save(net.module.cpu().state_dict(), save_path)

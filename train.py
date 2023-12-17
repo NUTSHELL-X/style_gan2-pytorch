@@ -3,7 +3,8 @@ import torch.nn as nn
 import numpy
 from torchvision import datasets,transforms
 import matplotlib.pyplot as plt
-from utils import plot_images,save_weights,save_training_params,print_networks
+from utils import plot_images,save_weights,save_training_params,print_networks,BCE_loss_disc,BCE_loss_gen,\
+WGAN_loss_disc,WGAN_loss_gen
 import os
 from tqdm import tqdm
 from dataset import create_dataloader
@@ -60,7 +61,7 @@ dataloader=create_dataloader((final_h,final_w),batch_size,dataset_type)
 def train_gen(net_gen,net_disc,opt_gen,opt,_disc):
     pass
 
-def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,total_epochs,epochs,dtype):
+def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,loss_fn_gen,loss_fn_disc,total_epochs,epochs,dtype):
     for i in range(epochs):
         print('updating epoch: {}'.format(total_epochs+i))
         print('current generator learning rate: ',sche_gen.get_last_lr())
@@ -68,22 +69,19 @@ def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,total_epochs,epochs,dt
         for idx,(real,labels) in tqdm(enumerate(dataloader)):
             #train disc
             real=real.to(device).to(dtype)
+            batch_size = real.shape[0]
             latent=torch.randn(batch_size,w_channels).to(device).to(dtype)
             fake=gen([base_tensor,latent])
             opt_disc.zero_grad()
-            disc_real=disc(real)
-            disc_fake=disc(fake.detach())
-            # d_loss=-torch.mean(disc(real))+torch.mean(disc(fake.detach()))
-            d_loss=loss_fn(disc_real.reshape(batch_size),torch.ones(batch_size).to(device).to(dtype))+loss_fn(disc_fake.reshape(batch_size),torch.zeros(batch_size).to(device).to(dtype))
-            # print('d_loss:',d_loss.item())
+            disc_real=disc(real).squeeze()
+            disc_fake=disc(fake.detach()).squeeze()
+            d_loss=loss_fn_disc(disc_real,disc_fake)
             d_loss.backward()
             torch.nn.utils.clip_grad_norm_(disc.parameters(), 1.)
             opt_disc.step()
             #train gen
             opt_gen.zero_grad()
-            # g_loss=-torch.mean(disc(fake))
-            g_loss=loss_fn(disc(fake).reshape(batch_size),torch.ones(batch_size).to(device).to(dtype))
-            # print('g_loss',g_loss.item())
+            g_loss=loss_fn_gen(disc(fake).squeeze())
             g_loss.backward()
             torch.nn.utils.clip_grad_norm_(gen.parameters(), 1.)
             opt_gen.step()
@@ -138,6 +136,8 @@ if __name__=='__main__':
     adam_eps = 1e-4 if dtype == torch.float16 else 1e-8
     opt_gen=optim.Adam(gen.parameters(),lr=lr,eps=adam_eps)
     opt_disc=optim.Adam(disc.parameters(),lr=lr,eps=adam_eps)
+    loss_fn_gen = WGAN_loss_gen
+    loss_fn_disc = WGAN_loss_disc
     if not os.path.exists(generated_image_folder) and save_images:
         os.mkdir(generated_image_folder)
     if not os.path.exists(args.save_dir):
@@ -163,7 +163,7 @@ if __name__=='__main__':
     sche_gen=StepLR(opt_gen,step_size=args.lr_step_size,gamma=args.gamma)
     sche_disc=StepLR(opt_disc,step_size=args.lr_step_size,gamma=args.gamma)
     print('total_epochs:',total_epochs)
-    train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,total_epochs,epochs,dtype)
+    train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,loss_fn_gen,loss_fn_disc,total_epochs,epochs,dtype)
     total_epochs+=epochs
 
     save_weights(gen,args.gen_weights_path,args.gpus)
