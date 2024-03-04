@@ -1,0 +1,36 @@
+# 保存model的路径
+model_path: "model_mc.pt"
+# 训练过程日志保存路径
+save_dir: "./exp"
+continues: True
+# 保存训练过程中生成图片的路径
+generated_image_folder: "./generated"
+#
+real_image_folder: "./real_images"
+gen_weights_path: "./exp/gen.pth"
+disc_weights_path: "./exp/disc.pth"
+
+# 优化器状态保存路径
+training_params_path: "./exp/training_params.pt"
+# dataset所在路径
+dataset_path: "/PublicData/MineCraft-RT_1280x720_v13"
+epochs: 100
+# dtype选择（功能还未完成）
+dtype: "float32"
+# 起始的分辨率
+start_res: [9,16]
+# 上采样2倍的次数
+upscale_times: 5
+# 初始的通道数
+start_channels: 256
+# 用于AdaIN的weight的通道数
+w_channels: 256
+batch_size: 4
+# learning rate
+lr: 1e-4
+# 以下三个功能还没完成，随意填即可
+lr_decay: "True"
+lr_step_size: 10
+milestones: [50,100]
+gamma: 0.9
+gpus: [0]

@@ -209,7 +209,7 @@ class Discriminator(nn.Module):
         self.dense0=nn.Linear(start_res[0]*start_res[1]*self.n_channels[0],512)
         self.leaky=nn.LeakyReLU(0.2)
         self.dense1=nn.Linear(512,1)
-        # self.sigmoid=nn.Sigmoid()
+        self.sigmoid=nn.Sigmoid()
         for i in range(steps,0,-1):
             self.d_blocks.append(D_block(self.n_channels[i],self.n_channels[i-1]))
 
@@ -221,7 +221,7 @@ class Discriminator(nn.Module):
         x=self.dense0(x)
         x=self.leaky(x)
         x=self.dense1(x)
-        # x=self.sigmoid(x)
+        x=self.sigmoid(x)
         return x
 
 if __name__=='__main__':

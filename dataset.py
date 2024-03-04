@@ -77,6 +77,7 @@ def create_dataloader(res,batch_size,dataset_type):
         [
             A.Resize(height=int(h/0.9),width=int(w/0.9)),
             A.RandomCrop(h,w),
+            A.HorizontalFlip(p=0.5),
             A.RGBShift(10,10,10),
             A.ColorJitter(brightness=0.1,contrast=0.1,saturation=0.1,hue=0),
             A.Normalize(mean=(0,0,0),std=(1,1,1)),

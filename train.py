@@ -34,6 +34,7 @@ final_w=start_res[1]*2**upscale_times
 dataset_type = args.dataset_type
 dtype = torch.float16 if args.dtype=='float16' else torch.float32
 generated_image_folder=args.generated_image_folder
+real_image_folder=args.real_image_folder # this is not dataset folder , used to see images loaded by dataloader
 device=args.device if torch.cuda.is_available() else "cpu"
 print('using device {device}'.format(device=device))
 # if os.path.exists(model_path):
@@ -53,11 +54,16 @@ print('using device {device}'.format(device=device))
 scaler_gen=torch.cuda.amp.GradScaler()
 scaler_disc=torch.cuda.amp.GradScaler()
 loss_fn=nn.BCEWithLogitsLoss()
-base_tensor=torch.ones((batch_size,start_channels,start_res[0],start_res[1])).to(device).to(dtype)
+base_tensor=0.5*torch.ones((batch_size,start_channels,start_res[0],start_res[1])).to(device).to(dtype)
 # if auto_scale:
 #     scaler_disc = torch.cuda.amp.GradScaler()
 #     scaler_gen = torch.cuda.amp.GradScaler()
 dataloader=create_dataloader((final_h,final_w),batch_size,dataset_type)
+
+def init_weights(model,init_func,*params, **kwargs):
+    for p in model.parameters():
+        init_func(p,*params,**kwargs)
+
 def train_gen(net_gen,net_disc,opt_gen,opt,_disc):
     pass
 
@@ -90,10 +96,12 @@ def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,loss_fn_gen,loss_fn_di
 
         print('d_loss: ',d_loss.item())
         print('g_loss: ',g_loss.item())
-        sche_gen.step()
-        sche_disc.step()
+        if args.lr_decay:
+            sche_gen.step()
+            sche_disc.step()
         if save_images:
             save_image(fake.cpu().detach()[0].to(torch.float32),os.path.join(generated_image_folder,f'generated_img_{total_epochs+i}.jpg'))
+            save_image(real.cpu()[0].to(torch.float32),os.path.join(real_image_folder,f'real_img_{total_epochs+i}.jpg'))
 
 # def train_fn_auto_scaler(epochs):
 #     for i in range(epochs):
@@ -129,27 +137,33 @@ def train_fn(gen,disc,opt_gen,opt_disc,sche_gen,sche_disc,loss_fn_gen,loss_fn_di
 if __name__=='__main__':
     epochs=args.epochs
     print('using dtype: ',dtype)
-    gen=Generator(start_res=2*start_res,w_c=w_channels,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
-    gen=torch.nn.DataParallel(gen,device_ids=args.gpus)
+    gen=Generator(start_res=start_res,w_c=w_channels,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
+    # init_weights(gen,nn.init.xavier_normal_)
+    gen=nn.DataParallel(gen,device_ids=args.gpus)
     disc=Discriminator(start_res=start_res,start_c=start_channels,steps=upscale_times).to(device).to(dtype)
-    disc=torch.nn.DataParallel(disc,device_ids=args.gpus)
+    # init_weights(disc,nn.init.xavier_normal_)
+    disc=nn.DataParallel(disc,device_ids=args.gpus)
     adam_eps = 1e-4 if dtype == torch.float16 else 1e-8
     opt_gen=optim.Adam(gen.parameters(),lr=lr,eps=adam_eps)
     opt_disc=optim.Adam(disc.parameters(),lr=lr,eps=adam_eps)
-    loss_fn_gen = WGAN_loss_gen
-    loss_fn_disc = WGAN_loss_disc
-    if not os.path.exists(generated_image_folder) and save_images:
-        os.mkdir(generated_image_folder)
+    loss_fn_gen = BCE_loss_gen
+    loss_fn_disc = BCE_loss_disc
+    if save_images:
+        if not os.path.exists(generated_image_folder):
+            os.mkdir(generated_image_folder)
+        if not os.path.exists(real_image_folder):
+            os.mkdir(real_image_folder)
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
     if args.continues: # load weights
+        print("continue training")
         if len(args.gpus) > 1:
             gen.module.load_state_dict(torch.load(args.gen_weights_path)) # 可能还有问题
             disc.module.load_state_dict(torch.load(args.disc_weights_path))
         else:
             gen.load_state_dict(torch.load(args.gen_weights_path))
             disc.load_state_dict(torch.load(args.disc_weights_path))
-        print('loaded saved weights ; Generator:{},Discriminator:{}'.format(args.gen_weights_path,args.disc_weights_path))
+        print('loaded saved weights ; Generator:{},  Discriminator:{}'.format(args.gen_weights_path,args.disc_weights_path))
         training_params=torch.load(args.training_params_path)
         opt_disc.load_state_dict(training_params['opt_disc_state_dict'])
         opt_gen.load_state_dict(training_params['opt_gen_state_dict'])

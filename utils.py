@@ -44,7 +44,7 @@ def print_networks(net):
     print('-----------------------------------------------')
 
 def BCE_loss_disc(disc_real,disc_fake):
-    loss_f = nn.BCEWithLogitsLoss()
+    loss_f = nn.BCELoss()
     bs = disc_real.shape[0]
     device = disc_real.device
     dtype= disc_real.dtype
@@ -55,7 +55,7 @@ def BCE_loss_disc(disc_real,disc_fake):
     return loss
 
 def BCE_loss_gen(disc_fake):
-    loss_f = nn.BCEWithLogitsLoss()
+    loss_f = nn.BCELoss()
     bs = disc_fake.shape[0]
     device = disc_fake.device
     dtype = disc_fake.dtype

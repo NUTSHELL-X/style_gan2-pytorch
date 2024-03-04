@@ -3,7 +3,7 @@ import torch
 
 def config_parser():
     parser=configargparse.ArgumentParser()
-    parser.add_argument('--config',is_config_file=True,help='config file path',default='config.txt')
+    parser.add_argument('--config',is_config_file=True,help='config file path',default='config.yaml')
     parser.add_argument('--device',type=str,default='cuda')
     parser.add_argument('--model_path',type=str) # path to save weights(.pt file)
     parser.add_argument('--gen_weights_path',type=str) # path to save generator
@@ -11,7 +11,8 @@ def config_parser():
     parser.add_argument('--training_params_path',type=str) # path to save training parameters(optimizor,total training epochs)
     parser.add_argument('--save_dir',type=str,default='./exp') # 
     parser.add_argument('--save_images',type=bool,default=True) # whether save images while training or not
-    parser.add_argument('--generated_image_folder',type=str) # path to save generated images(.jpg file) 
+    parser.add_argument('--generated_image_folder',type=str) # path to save generated images(.jpg file)
+    parser.add_argument('--real_image_folder',type=str) # path to save real images from dataloader(.jpg file)
     parser.add_argument('--save_freq_inside_epoch',type=int) # frequency to save image inside a epoch
     parser.add_argument('--dataset_path',type=str) # path containing dataset
     parser.add_argument('--dataset_type',type=str,default='image_folder') # dataset type (see dataset.py)
@@ -25,9 +26,9 @@ def config_parser():
     parser.add_argument('--w_channels',type=int) # channels for style code
     parser.add_argument('--batch_size',type=int) # batch size
     parser.add_argument('--lr',type=float) # learning rate
-    parser.add_argument('--lr_decay',type=bool) # learning rate decay or not
-    parser.add_argument('--lr_step_size',type=int) # lr decay frequency
-    parser.add_argument('--milestones',type=int,nargs='+',action='append') # milestones for learning rate decay
+    parser.add_argument('--lr_decay',type=bool,default=False) # learning rate decay or not
+    parser.add_argument('--lr_step_size',type=int,default=10) # lr decay frequency
+    parser.add_argument('--milestones',type=int,nargs='+') # milestones for learning rate decay
     parser.add_argument('--gamma',type=float) # learning rate decay ratio
     parser.add_argument('--continues',type=bool,default=True) # continues training or not
     parser.add_argument('--gpus',nargs='+',type=int) # used gpus e.g [0,1]
