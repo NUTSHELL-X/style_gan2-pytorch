@@ -2,7 +2,7 @@
 model_path: "model_mc.pt"
 # 训练过程日志保存路径
 save_dir: "./exp"
-continues: True
+continues:
 # 保存训练过程中生成图片的路径
 generated_image_folder: "./generated"
 #

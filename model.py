@@ -24,7 +24,7 @@ class EqualizedConv(nn.Module):
         return self.conv(x*self.scale)
 
 class EqualizedDense(nn.Module):
-    def __init__(self,in_units,out_units,gain=2,learning_rate_multiplier=1,**kwards):
+    def __init__(self,in_units,out_units,gain=2,learning_rate_multiplier=1,**kwargs):
         super().__init__()
         self.in_units=in_units
         self.out_units=out_units
@@ -88,6 +88,28 @@ class Mapping(nn.Module):
         for layer in self.net:
             w=layer(w)
         return w
+
+class MinibatchStd(nn.Module):
+    def __init__(self,group_size,num_channels=1):
+        super().__init__()
+        self.group_size = group_size
+        self.num_channels = num_channels
+
+    def forward(self,x):
+        N,C,H,W = x.shape
+        G = min(N,self.group_size)
+        F = self.num_channels
+        c = C//F
+
+        y = x.reshape(-1,G,F,c,H,W)
+        y = torch.std(y,dim=1) # (n=N//G,F,c,H,W)
+        y = y.mean(dim=[2,3,4]) # (n,F)
+        y = y.reshape(-1,F,1,1) # (n,F,1,1)
+        y = y.repeat(G,1,H,W) # (N,F,H,W)
+        x = torch.cat([x,y],dim=1)
+
+        return x
+    
 
 class G_block(nn.Module):
     def __init__(self,in_c,out_c,w_c,need_upsample=False):
@@ -195,6 +217,7 @@ class Discriminator(nn.Module):
         self.start_res=start_res
         self.steps=steps
         self.d_blocks=nn.ModuleList()
+        self.mbstd = MinibatchStd(group_size=4,num_channels=1)
         self.n_channels={
             0:start_c,
             1:start_c,
@@ -210,6 +233,7 @@ class Discriminator(nn.Module):
         self.leaky=nn.LeakyReLU(0.2)
         self.dense1=nn.Linear(512,1)
         self.sigmoid=nn.Sigmoid()
+        self.conv=nn.Conv2d(self.n_channels[0]+1,self.n_channels[0],3,padding=1)
         for i in range(steps,0,-1):
             self.d_blocks.append(D_block(self.n_channels[i],self.n_channels[i-1]))
 
@@ -217,6 +241,8 @@ class Discriminator(nn.Module):
         x=self.from_rgb(x)
         for i in range(self.steps):
             x=self.d_blocks[i](x)
+        x = self.mbstd(x)
+        x = self.conv(x)
         x=self.flatten(x)
         x=self.dense0(x)
         x=self.leaky(x)
