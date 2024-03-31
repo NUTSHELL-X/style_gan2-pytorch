@@ -1,6 +1,7 @@
-# style_gan2-pytorch
-StyleGan2\
-Pytorch Inplementation of StyleGan2 (Updating,some components are still missing)
+# StyleGAN2-pytorch
+StyleGAN2\
+Pytorch Inplementation of StyleGAN2 (Updating,some components are still missing)
+
 ## Environment
 python 3.10 , torch 2.0
 ## Get Start
